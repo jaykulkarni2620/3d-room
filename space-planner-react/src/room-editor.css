@@ -1,0 +1,508 @@
+.builder-actions {
+  gap: 8px;
+}
+
+.room-editor-screen {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  grid-template-columns: min(460px, 32vw) minmax(0, 1fr);
+  overflow: hidden;
+  background: #fff;
+  color: #18221e;
+}
+
+.room-editor-sidebar {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid #e5e0d9;
+  background: #fff;
+}
+
+.room-editor-content {
+  flex: 1;
+  overflow: auto;
+  padding: 36px 28px 20px;
+}
+
+.room-editor-step {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.room-editor-progress {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-bottom: 24px;
+}
+
+.room-editor-progress i {
+  height: 3px;
+  border-radius: 3px;
+  background: #e3e5e0;
+}
+
+.room-editor-progress i.on {
+  background: #111;
+}
+
+.room-editor-content h2 {
+  margin: 0 0 12px;
+  font: 700 clamp(24px, 2.2vw, 30px)/1.1 Manrope, sans-serif;
+  letter-spacing: -.03em;
+}
+
+.room-editor-content p {
+  margin: 0 0 12px;
+  color: #6f716d;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.room-editor-demo {
+  display: block;
+  width: min(260px, 100%);
+  height: auto;
+  margin: 24px auto 18px;
+}
+
+.room-editor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+
+.room-editor-segment {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid #deded9;
+  border-radius: 99px;
+}
+
+.room-editor-segment button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.room-editor-segment button[aria-pressed='true'] {
+  box-shadow: 0 0 0 1.5px #18221e inset;
+}
+
+.room-editor-content h3 {
+  margin: 20px 0 8px;
+  font-size: 15px;
+}
+
+.room-editor-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.room-editor-fields.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 14px 26px;
+}
+
+.room-editor-fields label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  color: #77736d;
+  font-size: 11px;
+}
+
+.room-editor-fields input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e1ded8;
+  border-radius: 7px;
+  background: #fff;
+  color: #252521;
+  font: inherit;
+}
+
+.room-editor-area {
+  margin-top: 12px !important;
+  font: 12px 'DM Mono', monospace !important;
+}
+
+.room-editor-action {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+}
+
+.room-editor-action:hover,
+.room-editor-action[aria-pressed='true'] {
+  background: #f3f3f0;
+}
+
+.room-editor-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+.room-editor-check input {
+  accent-color: #245e4b;
+}
+
+.room-editor-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(30px, 40px));
+  gap: 10px;
+}
+
+.room-editor-swatches button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #0002;
+  border-radius: 9px;
+  background: var(--swatch);
+}
+
+.room-editor-swatches button.active {
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 4px #245e4b;
+}
+
+.room-editor-summary {
+  display: grid;
+  gap: 0;
+  margin: 20px 0 0;
+}
+
+.room-editor-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid #e5e0d9;
+}
+
+.room-editor-summary dt {
+  color: #6f716d;
+}
+
+.room-editor-summary dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.room-editor-color {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #0002;
+  border-radius: 5px;
+  background: var(--wall-color);
+}
+
+.room-editor-footer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 28px 24px;
+  border-top: 1px solid #e5e0d9;
+  background: #ffffffef;
+}
+
+.room-editor-footer button {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.room-editor-next {
+  border: 1px solid #111;
+  background: #111;
+  color: #fff;
+}
+
+.room-editor-next:hover {
+  background: #30352f;
+}
+
+.room-editor-back {
+  border: 1px solid #bbb;
+  background: #fff;
+  color: #111;
+}
+
+.room-editor-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #cfcfcf;
+}
+
+.room-editor-plan {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+}
+
+.room-editor-pill {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 99px;
+  background: #fff;
+  box-shadow: 0 2px 10px #0002;
+}
+
+.room-editor-pill.left {
+  left: 20px;
+}
+
+.room-editor-pill.center {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.room-editor-pill.right {
+  right: 18px;
+  padding: 0;
+}
+
+.room-editor-pill button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.room-editor-pill.left button {
+  padding: 9px 12px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.room-editor-pill.right button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 20px;
+}
+
+.room-editor-pill button[aria-pressed='true'] {
+  background: #111;
+  color: #fff;
+}
+
+.room-editor-pill button:disabled {
+  cursor: default;
+  opacity: .35;
+}
+
+.room-plan-wall-highlight {
+  fill: none;
+  stroke: #ffd200;
+  stroke-width: 14;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.room-plan-hit.active .room-plan-wall-highlight,
+.active .room-plan-wall-highlight {
+  opacity: 1;
+}
+
+.room-plan-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 30;
+  pointer-events: stroke;
+}
+
+.room-plan-handle {
+  fill: #fff;
+  stroke: #14181a;
+  stroke-width: 2;
+}
+
+.room-plan-area,
+.room-plan-label {
+  fill: #24231f;
+  font-family: 'DM Sans', sans-serif;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #cfcfcf;
+  stroke-width: 8px;
+  stroke-linejoin: round;
+}
+
+.room-plan-area {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.room-plan-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.room-plan-label.vertical {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(-90deg);
+}
+
+.room-plan-dimension {
+  stroke: #5b5b58;
+  stroke-width: 1.2;
+}
+
+.ceiling-handle {
+  cursor: ns-resize;
+}
+
+.ceiling-outline {
+  fill: none;
+  stroke: #f4f1eb;
+  stroke-width: 6;
+  pointer-events: none;
+}
+
+.room-plan-height-handle {
+  fill: #fff;
+  stroke: #14181a;
+  stroke-width: 2;
+  cursor: ns-resize;
+}
+
+.room-opening-drag {
+  cursor: grab;
+  touch-action: none;
+}
+
+.room-opening-drag:active {
+  cursor: grabbing;
+}
+
+.room-opening-shape {
+  fill: #cfe4ed;
+  stroke: #f7f5ef;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.room-opening-shape.door {
+  fill: #f8f7f2;
+  stroke: #d7d2c8;
+  stroke-width: 5;
+}
+
+.room-opening-shape.selected {
+  stroke: #ffd200;
+  stroke-width: 5;
+}
+
+.room-opening-dimensions rect {
+  fill: #171717;
+  stroke: #fff;
+  stroke-width: 1;
+}
+
+.room-opening-dimensions text {
+  fill: #fff;
+  font: 600 11px 'DM Sans', sans-serif;
+  text-anchor: middle;
+}
+
+.room-opening-dimensions.selected rect {
+  stroke: #ffd200;
+  stroke-width: 2;
+}
+
+@media (max-width: 900px) {
+  .room-editor-screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(300px, 55vh) minmax(0, 1fr);
+  }
+
+  .room-editor-stage {
+    order: 1;
+  }
+
+  .room-editor-sidebar {
+    order: 2;
+    border-top: 1px solid #e5e0d9;
+    border-right: 0;
+  }
+
+  .room-editor-content {
+    padding: 18px 20px 12px;
+  }
+
+  .room-editor-demo {
+    display: none;
+  }
+
+  .room-editor-footer {
+    padding: 12px 20px 16px;
+  }
+
+  .room-editor-pill {
+    top: 10px;
+  }
+
+  .room-editor-pill.left {
+    left: 10px;
+  }
+
+  .room-editor-pill.right {
+    right: 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  .room-editor-screen {
+    grid-template-rows: minmax(240px, 38vh) minmax(0, 1fr);
+  }
+
+  .room-editor-pill button {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .room-editor-pill.left button {
+    padding: 8px;
+  }
+}

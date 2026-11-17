@@ -4,6 +4,8 @@ import { Bounds, ContactShadows, Environment, Lightformer, OrbitControls, useGLT
 import { ErrorBoundary } from 'react-error-boundary';
 import * as THREE from 'three';
 import { makeOakMaps } from './room-assets.js';
+import RoomEditor from './RoomEditor.jsx';
+import './design-type.css';
 
 const API = import.meta.env.VITE_CATALOG_ENDPOINT || '/wp-json/siaan-planner/v1/products';
 const presets = [
@@ -34,9 +36,9 @@ function normalizeProduct(raw) {
 }
 
 function App() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [preset, setPreset] = useState(presets[0]);
-  const [room, setRoom] = useState({ width: 17.9, depth: 13.8, height: 9, wall: '#eeeae3', window: true, door: true, windowW: 4.8, windowH: 3.5, doorW: 3, doorH: 6.8 });
+  const [room, setRoom] = useState({ width: 17.9, depth: 13.8, height: 9, wall: '#eeeae3', window: true, door: true, windowW: 4.8, windowH: 3.5, doorW: 3, doorH: 6.8, windowPosition: .42, doorPosition: .7, flipH: false, flipV: false, rotation: 0 });
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [category, setCategory] = useState('');
@@ -47,6 +49,7 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState('angle');
   const [dragging, setDragging] = useState(false);
+  const [roomEditorOpen, setRoomEditorOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -77,9 +80,9 @@ function App() {
   }, [items.length]);
   const updateItem = useCallback((id, patch) => setItems((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item)), []);
   const removeSelected = () => { setItems((current) => current.filter((item) => item.id !== selected)); setSelected(null); };
-  const startOver = () => { setItems([]); setSelected(null); setStep(1); };
-  const next = () => setStep((current) => Math.min(4, current + 1));
-  const back = () => setStep((current) => Math.max(1, current - 1));
+  const startOver = () => { setItems([]); setSelected(null); setRoomEditorOpen(false); setStep(0); };
+  const next = () => setStep((current) => current === 2 ? 4 : Math.min(4, current + 1));
+  const back = () => setStep((current) => Math.max(0, current - 1));
 
   return (
     <main className="app-shell">
@@ -88,17 +91,40 @@ function App() {
         <p className="hero-copy">Choose a room plan, explore your space in 3D, and build an itemized estimate from the live store catalog.</p>
       </header>
       <nav className="steps" aria-label="Planner steps">
-        {['Space type', 'Size', 'Your area', 'Design'].map((label, index) => <button key={label} className={step === index + 1 ? 'current' : step > index + 1 ? 'done' : ''} onClick={() => step > index + 1 && setStep(index + 1)}><span>{index + 1}</span>{label}</button>)}
+        {['Space type', 'Size', 'Your area', 'Design'].map((label, index) => <button key={label} className={Math.max(step, 1) === index + 1 ? 'current' : Math.max(step, 1) > index + 1 ? 'done' : ''} onClick={() => { if (step > index + 1) { if (step === 4 && index === 2) setRoomEditorOpen(true); else setStep(index + 1); } }}><span>{index + 1}</span>{label}</button>)}
       </nav>
 
-      {step < 4 ? <section className="wizard panel">
+      {step === 0 ? <section className="wizard panel design-type-panel">
+        <div className="panel-title"><h2>What are you designing?</h2></div>
+        <div className="design-type-grid">
+          <button className="design-type-card" onClick={() => setStep(1)}>
+            <span className="design-type-visual" aria-hidden="true" />
+            <strong>Room inspiration</strong>
+            <small>Choose a room style and start designing.</small>
+            <span className="design-type-range">118 - 473 sq ft</span>
+          </button>
+          <button className="design-type-card" disabled>
+            <span className="design-type-visual commercial" aria-hidden="true" />
+            <strong>Commercial</strong>
+            <small>Offices, showrooms and retail floors.</small>
+            <span className="design-type-range">600 - 2,000 sq ft</span>
+            <span className="design-type-note">Coming soon</span>
+          </button>
+          <button className="design-type-card" disabled>
+            <span className="design-type-visual hospitality" aria-hidden="true" />
+            <strong>Hospitality</strong>
+            <small>Hotel rooms, cafes and restaurants.</small>
+            <span className="design-type-range">450 - 1,800 sq ft</span>
+            <span className="design-type-note">Coming soon</span>
+          </button>
+        </div>
+      </section> : step < 4 ? <section className="wizard panel">
         <div className="panel-title"><div><p className="eyebrow">STEP {step} OF 4</p><h2>{step === 1 ? 'Choose your room inspiration' : step === 2 ? 'Set your room size' : 'Add openings and wall finish'}</h2></div><span className="step-note">Your choices can be changed later</span></div>
-        {step === 1 && <><div className="space-switch"><button className="chosen">Residential</button><button disabled>Commercial</button><button disabled>Hospitality</button></div><div className="preset-grid">{presets.map((item) => <button key={item[0]} className={`preset-card ${preset[0] === item[0] ? 'selected' : ''}`} onClick={() => { setPreset(item); setRoom((current) => ({ ...current, width: Math.round(Math.sqrt(item[1] * 1.3) * 10) / 10, depth: Math.round(Math.sqrt(item[1] / 1.3) * 10) / 10 })); }}><span className="preset-image"><RoomThumb /></span><strong>{item[0]}</strong><small>{item[1]} sq.ft</small><span className="hover-cta">✎ Design this room</span></button>)}</div></>}
+        {step === 1 && <div className="preset-grid">{presets.map((item) => <button key={item[0]} className={`preset-card ${preset[0] === item[0] ? 'selected' : ''}`} onClick={() => { setPreset(item); setRoom((current) => ({ ...current, width: Math.round(Math.sqrt(item[1] * 1.3) * 10) / 10, depth: Math.round(Math.sqrt(item[1] / 1.3) * 10) / 10 })); setStep(2); }}><span className="preset-image"><RoomThumb /></span><strong>{item[0]}</strong><small>{item[1]} sq.ft</small><span className="hover-cta">Set room size</span></button>)}</div>}
         {step === 2 && <div className="size-form"><label>Room width <span>ft</span><input type="number" min="5" max="80" step="0.1" value={room.width} onChange={(e) => setRoom({ ...room, width: Number(e.target.value) })} /></label><label>Room length <span>ft</span><input type="number" min="5" max="80" step="0.1" value={room.depth} onChange={(e) => setRoom({ ...room, depth: Number(e.target.value) })} /></label><label>Ceiling height <span>ft</span><input type="number" min="7" max="20" step="0.1" value={room.height} onChange={(e) => setRoom({ ...room, height: Number(e.target.value) })} /></label><div className="area-preview"><span>Approximate area</span><strong>{Math.round(room.width * room.depth)} sq.ft</strong><small>Adjust the dimensions to match your room.</small></div></div>}
-        {step === 3 && <div className="feature-grid"><section><h3>Room features</h3><label className="toggle"><input type="checkbox" checked={room.door} onChange={(e) => setRoom({ ...room, door: e.target.checked })} /> Add an interior door</label>{room.door && <div className="pair-fields"><label>Door width (ft)<input type="number" min="2" max="6" step="0.1" value={room.doorW} onChange={(e) => setRoom({ ...room, doorW: Number(e.target.value) })} /></label><label>Door height (ft)<input type="number" min="5" max="9" step="0.1" value={room.doorH} onChange={(e) => setRoom({ ...room, doorH: Number(e.target.value) })} /></label></div>}<label className="toggle"><input type="checkbox" checked={room.window} onChange={(e) => setRoom({ ...room, window: e.target.checked })} /> Add a glass window</label>{room.window && <div className="pair-fields"><label>Window width (ft)<input type="number" min="2" max="12" step="0.1" value={room.windowW} onChange={(e) => setRoom({ ...room, windowW: Number(e.target.value) })} /></label><label>Window height (ft)<input type="number" min="1" max="8" step="0.1" value={room.windowH} onChange={(e) => setRoom({ ...room, windowH: Number(e.target.value) })} /></label></div>}</section><section><h3>Wall color</h3><div className="wall-swatches">{wallColors.map(([name, color]) => <button key={color} title={name} aria-label={name} className={room.wall === color ? 'active' : ''} style={{ '--swatch': color }} onClick={() => setRoom({ ...room, wall: color })} />)}</div></section></div>}
-        <footer className="wizard-footer"><button className="btn secondary" onClick={back} disabled={step === 1}>Back</button><button className="btn primary" onClick={next}>{step === 3 ? 'Design this room' : 'Next'}</button></footer>
+        <footer className="wizard-footer"><button className="btn secondary" onClick={back}>Back</button><button className="btn primary" onClick={next}>{step === 2 ? 'Design this room' : 'Next'}</button></footer>
       </section> : <>
-        <div className="builder-meta"><div><span>{preset[0]}</span><span>/</span><span>{Math.round(room.width * room.depth)} sq.ft assigned</span></div><button className="btn secondary compact" onClick={startOver}>Start over</button></div>
+        <div className="builder-meta"><div><span>{preset[0]}</span><span>/</span><span>{Math.round(room.width * room.depth)} sq.ft assigned</span></div><div className="builder-actions"><button className="btn secondary compact" onClick={() => setRoomEditorOpen(true)}>Edit room</button><button className="btn secondary compact" onClick={startOver}>Start over</button></div></div>
         <section className="builder">
           <aside className="catalog panel">
             <div className="catalog-head"><strong>Shop the catalog</strong><small role="status">{catalogState}</small></div>
@@ -118,6 +144,7 @@ function App() {
             <section className="estimate panel"><div className="estimate-head"><div><p className="eyebrow">LIVE ESTIMATE</p><h2>Your design</h2></div><span>{items.length} {items.length === 1 ? 'item' : 'items'}</span></div>{items.length ? <div className="estimate-list">{Object.entries(countById).map(([productId, count]) => { const product = products.find((entry) => entry.id === productId); return product && <div className="estimate-row" key={productId}><span><strong>{product.name}</strong><small>{money(product.price, currency)} each</small></span><div className="qty"><button onClick={() => setItems((current) => { const found = current.find((entry) => entry.productId === productId); return found ? current.filter((entry) => entry.id !== found.id) : current; })}>−</button><span>{count}</span><button onClick={() => addProduct(product)}>+</button></div><b>{money(product.price * count, currency)}</b></div>; })}<div className="total-row"><span>Estimated total</span><strong>{money(total, currency)}</strong></div></div> : <p className="empty">Add products to the room to see your itemized estimate.</p>}</section>
           </div>
         </section>
+        {roomEditorOpen && <RoomEditor room={room} wallColors={wallColors} onApply={(updatedRoom) => { setRoom(updatedRoom); setRoomEditorOpen(false); }} onClose={() => setRoomEditorOpen(false)} />}
       </>}
     </main>
   );
@@ -142,7 +169,7 @@ function RoomScene({ room, items, products, selected, onSelect, onUpdate, draggi
       <Lightformer form="rect" intensity={1.3} color="#f6f5f1" position={[5, 5, -4]} scale={[7, 4, 1]} />
       <Lightformer form="rect" intensity={.7} color="#fff8ee" position={[0, 3, 8]} scale={[5, 3, 1]} />
     </Environment>
-    <group position={[0, -.04, 0]}>
+    <group position={[0, -.04, 0]} rotation={[0, (room.rotation || 0) * Math.PI / 2, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[room.width, room.depth]} />
         <meshPhysicalMaterial map={maps.albedo} normalMap={maps.normalMap} roughnessMap={maps.roughnessMap} roughness={.76} normalScale={new THREE.Vector2(.22, .22)} clearcoat={.08} clearcoatRoughness={.8} />
@@ -170,8 +197,11 @@ function RoomWall({ position, size, color }) { return <mesh position={position} 
 function Baseboard({ position, size }) { return <mesh position={position} castShadow={false}><boxGeometry args={size} /><meshStandardMaterial color="#f4f1eb" roughness={.78} /></mesh>; }
 
 function WindowFeature({ room }) {
-  const width = Math.min(room.windowW, room.width * .6), height = Math.min(room.windowH, room.height * .58), y = Math.min(room.height * .61, room.height - height / 2 - .3);
-  return <group position={[0, y, -room.depth / 2 + .13]}>
+  const wallWidth = room.rotation % 2 ? room.depth : room.width;
+  const width = Math.min(room.windowW, wallWidth * .6), height = Math.min(room.windowH, room.height * .58), y = Math.min(room.height * .61, room.height - height / 2 - .3);
+  const position = room.flipH ? 1 - (room.windowPosition || .42) : room.windowPosition || .42;
+  const x = -room.width / 2 + room.width * position;
+  return <group position={[x, y, room.flipV ? room.depth / 2 - .13 : -room.depth / 2 + .13]} rotation={[0, room.flipV ? Math.PI : 0, 0]}>
     <mesh castShadow={false}><boxGeometry args={[width + .18, height + .18, .16]} /><meshStandardMaterial color="#faf8f2" roughness={.65} /></mesh>
     <mesh position={[0, 0, .09]}><boxGeometry args={[width, height, .035]} /><meshPhysicalMaterial color="#a7d0dc" roughness={.13} metalness={.05} transmission={.16} transparent opacity={.78} /></mesh>
     <mesh position={[0, 0, .12]}><boxGeometry args={[.045, height, .025]} /><meshStandardMaterial color="#f7f5ef" /></mesh>
@@ -180,8 +210,10 @@ function WindowFeature({ room }) {
 }
 
 function DoorFeature({ room }) {
-  const width = Math.min(room.doorW, room.depth * .4), height = Math.min(room.doorH, room.height - .3);
-  return <group position={[room.width / 2 - .105, height / 2, -room.depth * .22]} rotation={[0, Math.PI / 2, 0]}>
+  const wallWidth = room.rotation % 2 ? room.width : room.depth;
+  const width = Math.min(room.doorW, wallWidth * .4), height = Math.min(room.doorH, room.height - .3);
+  const position = room.flipV ? 1 - (room.doorPosition || .7) : room.doorPosition || .7;
+  return <group position={[room.flipH ? -room.width / 2 + .105 : room.width / 2 - .105, height / 2, -room.depth / 2 + room.depth * position]} rotation={[0, room.flipH ? -Math.PI / 2 : Math.PI / 2, 0]}>
     <mesh castShadow><boxGeometry args={[width + .17, height + .16, .14]} /><meshStandardMaterial color="#f6f3ed" roughness={.7} /></mesh>
     <mesh position={[0, 0, .09]} castShadow><boxGeometry args={[width, height, .07]} /><meshStandardMaterial color="#eeeae3" roughness={.76} /></mesh>
     <mesh position={[width * .36, 0, .14]}><sphereGeometry args={[.065, 16, 12]} /><meshStandardMaterial color="#9b7e56" metalness={.72} roughness={.3} /></mesh>
@@ -207,7 +239,10 @@ function ProductInstance({ item, product, room, selected, onSelect, onUpdate, se
     if (event.buttons !== 1) return;
     event.stopPropagation();
     const point = new THREE.Vector3();
-    if (event.ray.intersectPlane(plane, point)) onUpdate(item.id, { x: THREE.MathUtils.clamp(point.x, -room.width / 2 + product.widthCm / 60.96, room.width / 2 - product.widthCm / 60.96), z: THREE.MathUtils.clamp(point.z, -room.depth / 2 + product.depthCm / 60.96, room.depth / 2 - product.depthCm / 60.96) });
+    if (event.ray.intersectPlane(plane, point)) {
+      point.applyAxisAngle(new THREE.Vector3(0, 1, 0), -(room.rotation || 0) * Math.PI / 2);
+      onUpdate(item.id, { x: THREE.MathUtils.clamp(point.x, -room.width / 2 + product.widthCm / 60.96, room.width / 2 - product.widthCm / 60.96), z: THREE.MathUtils.clamp(point.z, -room.depth / 2 + product.depthCm / 60.96, room.depth / 2 - product.depthCm / 60.96) });
+    }
   };
   const width = product.widthCm / 30.48, depth = product.depthCm / 30.48, height = product.heightCm / 30.48;
   return <group position={[item.x, 0, item.z]} rotation={[0, item.rotation, 0]} onPointerDown={handleDown} onPointerMove={handleMove} onPointerUp={() => setDragging(false)} onPointerCancel={() => setDragging(false)}>
