@@ -320,6 +320,15 @@ body{padding-block:24px 56px;background:var(--bg)}.shell{max-width:1480px}.top{a
 .ed-act{display:flex;align-items:center;gap:12px;background:none;border:0;padding:10px 4px;font-size:16px;width:100%;text-align:left;border-radius:8px}
 .ed-act:hover{background:#f3f3f0}
 .ed-act[aria-pressed="true"]{font-weight:700;color:var(--accent)}
+.ed-note{margin:6px 0 10px;color:#666;font-size:12px;line-height:1.45}
+.ed-partition-list{display:grid;gap:6px;margin-top:10px}
+.ed-partition-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid #e5e1d8;border-radius:8px;font-size:12px}
+.ed-partition-row button{border:0;background:none;color:#a33;padding:4px 6px;cursor:pointer}
+.ed-pill[hidden]{display:none!important}
+.ed-hint[hidden]{display:none!important}
+.ed-context-action{position:absolute;z-index:6;transform:translate(-50%,-120%);padding:4px;background:#fff;border:1px solid #ddd8d0;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.ed-context-action[hidden]{display:none!important}
+.ed-context-action button{border:0;border-radius:9px;background:#171717;color:#fff;padding:9px 12px;font-weight:700;white-space:nowrap;cursor:pointer}
 .ed-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .ed-fields label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .ed-fields input{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;font:inherit;color:var(--ink);background:#fff}
@@ -390,6 +399,7 @@ body{padding-block:24px 56px;background:var(--bg)}.shell{max-width:1480px}.top{a
 .ed-pill button{transition:background .15s,color .15s}
 .ed-pill button:not([aria-pressed="true"]):not(:disabled):hover{background:#f1f1ee}
 .ed-hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:2;pointer-events:none;background:rgba(17,17,17,.62);color:#fff;font-size:12.5px;padding:8px 14px;border-radius:99px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px);opacity:0;transition:opacity .2s}
+#edPartitionHint{opacity:1}
 @media(hover:none){.ed-hint{opacity:1}}
 .ed-look .ed-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:26px 0 12px}
 .ed-look .ed-head:first-child{margin-top:8px}
@@ -542,6 +552,8 @@ body{padding-block:24px 56px;background:var(--bg)}.shell{max-width:1480px}.top{a
       <h3>Room orientation</h3>
       <button class="ed-act" type="button" id="edFlipH" aria-pressed="false"><span aria-hidden="true">⇋</span> Flip horizontal</button>
       <button class="ed-act" type="button" id="edFlipV" aria-pressed="false"><span aria-hidden="true">⇅</span> Flip vertical</button>
+      <h3>Room outline</h3>
+      <p class="ed-note">Click a wall to add a corner dot. Drag dots to shape your room; click a dot and use Delete to remove it.</p>
       </div>
       <div class="ed-openings" id="edOpenings" hidden>
         <p>Choose a style to add it, or drag it onto a wall. Select any opening to edit its size; drag it in 3D to reposition it.</p>
@@ -586,6 +598,8 @@ body{padding-block:24px 56px;background:var(--bg)}.shell{max-width:1480px}.top{a
     <div class="ed-pill c" id="edPillViews"><button type="button" id="edTabPlan" aria-pressed="true">Floor plan</button><button type="button" id="edTabCeil" aria-pressed="false">Ceiling height</button></div>
     <div class="ed-pill r"><button type="button" id="edClose" aria-label="Close editor">✕</button></div>
     <svg id="edSvg" viewBox="0 0 800 560" preserveAspectRatio="xMidYMid meet" aria-label="Floor plan editor"></svg>
+    <div class="ed-hint" id="edPartitionHint" hidden>Click a wall to add a corner. Drag a corner to shape the room; click a corner to delete it.</div>
+    <div class="ed-context-action" id="edVertexDelete" hidden><button type="button" id="edVertexDeleteBtn" aria-label="Delete corner">▤ Delete</button></div>
     <div class="ed-pill c" id="edPillCam" hidden><button type="button" id="edCamAngle">Angle</button><button type="button" id="edCamTop">Top</button><button type="button" id="edCamCeil">Lights</button></div>
     <div class="ed-hint" id="edHint" hidden>Drag to look around · scroll to zoom · tap Lights to look up at the ceiling</div>
   </div>
@@ -950,7 +964,7 @@ function initScene(){
     controls.update();updateWalls();renderer.render(scene,camera);drawMeasurements();})();
 }
 function resize(){
-  if(typeof ED!=='undefined'&&ED.open&&ED.step>=3){resizeEditorCanvas();return;}
+  if(typeof ED!=='undefined'&&ED.open&&(ED.step===1||ED.step>=3)){resizeEditorCanvas();return;}
   var st=$('stage'),w=st.clientWidth,h=st.clientHeight;if(!w||!h||!renderer)return;
   renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();resizeMeasureOverlay(w,h);
 }
@@ -1164,6 +1178,8 @@ function glowTexture(){
 /* Ceiling, recessed downlights with glow, and the four real lights that light the room. */
 function buildCeiling(room,w,d,H){
   var on=room.lights!==false,darkFloor=room.floor==='walnut'||room.floor==='ebony'||!!floorStyleOf(room.floor).dark,tone=CEIL_TONES[room.tone]||CEIL_TONES.cool,i,j;
+  var wallLightIntensity=darkFloor?0.21:0.19;
+  if(room.wallColor==='#b8622a')wallLightIntensity+=0.08;
   ceilingGroup=new T.Group();
   ceilingGroup.visible=ceilingVisible;
   var ceil=new T.Mesh(new T.PlaneGeometry(w+.8,d+.8),new T.MeshStandardMaterial({color:'#f4f2ed',roughness:1,metalness:0}));
@@ -1191,8 +1207,8 @@ function buildCeiling(room,w,d,H){
   });
   ceilLights.forEach(function(L,k){
     var target=wallLights[k];
-    L.position.set(target.x,H-.6,target.z);L.target.position.set(target.tx,H*.74,target.tz);L.target.updateMatrixWorld();L.color.setHex(tone.light);
-    L.distance=0;L.decay=2;L.angle=1.15;L.penumbra=.66;L.intensity=on?(darkFloor?.21:.19):0;
+    L.position.set((Number(room.cx)||0)+target.x,H-.6,(Number(room.cz)||0)+target.z);L.target.position.set((Number(room.cx)||0)+target.tx,H*.74,(Number(room.cz)||0)+target.tz);L.target.updateMatrixWorld();L.color.setHex(tone.light);
+    L.distance=0;L.decay=2;L.angle=1.15;L.penumbra=.66;L.intensity=on?wallLightIntensity:0;
   });
 
   setRoomShadows();
@@ -1203,14 +1219,69 @@ function setCeilingView(){
   var r=S.rooms[S.active];if(!r||!camera)return;
   ceilingVisible=true;if(ceilingGroup)ceilingGroup.visible=true;
   var span=Math.max(r.w,r.d),H=r.h||9,asp=camera.aspect||1.5,dist=(span*1.0+8)*Math.max(1,1.3/asp),el_=.04,az=.45;
-  controls.target.set(0,H*.5,0);
-  camera.position.set(Math.sin(az)*Math.cos(el_)*dist,H*.5+Math.sin(el_)*dist,Math.cos(az)*Math.cos(el_)*dist);
+  controls.target.set(Number(r.cx)||0,H*.5,Number(r.cz)||0);
+  camera.position.set((Number(r.cx)||0)+Math.sin(az)*Math.cos(el_)*dist,H*.5+Math.sin(el_)*dist,(Number(r.cz)||0)+Math.cos(az)*Math.cos(el_)*dist);
   controls.minDistance=6;controls.maxDistance=dist*2.4;controls.update();
 }
 function clearGroup(g){while(g.children.length){var o=g.children[0];g.remove(o);disposeObj(o);}}
+function roomOutline(room){
+  if(room&&Array.isArray(room.outline)&&room.outline.length>=3)return room.outline.map(function(p){return {x:Number(p.x)||0,z:Number(p.z)||0};});
+  var w=room.w,d=room.d;return [{x:-w/2,z:-d/2},{x:w/2,z:-d/2},{x:w/2,z:d/2},{x:-w/2,z:d/2}];
+}
+function outlineBounds(points){
+  var xs=points.map(function(p){return p.x;}),zs=points.map(function(p){return p.z;});return {minX:Math.min.apply(null,xs),maxX:Math.max.apply(null,xs),minZ:Math.min.apply(null,zs),maxZ:Math.max.apply(null,zs)};
+}
+function outlineArea(points){var a=0;for(var i=0;i<points.length;i++){var p=points[i],q=points[(i+1)%points.length];a+=p.x*q.z-q.x*p.z;}return Math.abs(a/2);}
+function outlineShape(points){var shape=new T.Shape();points.forEach(function(p,i){if(i)shape.lineTo(p.x,-p.z);else shape.moveTo(p.x,-p.z);});shape.closePath();return shape;}
+function outlineEdgeForFeature(feature,points){
+  if(Number.isInteger(feature.edge)&&feature.edge>=0&&feature.edge<points.length)return feature.edge;
+  var preferred={n:0,e:1,s:2,w:3}[feature.wall];return Math.min(points.length-1,preferred===undefined?0:preferred);
+}
+function addOutlineOpening(group,kind,feature,room,edgeIndex,length){
+  var opening=new T.Group();opening.userData={openingKind:kind,openingIndex:feature.openingIndex,edgeIndex:edgeIndex};
+  var dims=openingDimensions(kind,feature,room),size=clampv(dims.width,.5,length*.84),isDoor=kind==='door',height=Math.min(dims.height,isDoor?(room.h||9)-.2:(room.h||9)-1.5),pos=clampv(Number.isFinite(Number(feature.pos))?Number(feature.pos):.5,.04,.96),centerY=isDoor?height/2:(Number.isFinite(Number(feature.elevation))?Number(feature.elevation):5.1);
+  opening.position.set((pos-.5)*length,centerY,.09);
+  function box(w,h,d,color,x,y,z,opts){return bx2(opening,w,h,d,color,x,y,z,opts);}
+  box(size+.3,height+.3,.13,'#d9d3c9',0,0,0);
+  box(size,height,.09,isDoor?'#f7f5ef':'#b9d3e1',0,0,.09,isDoor?null:{transparent:true,opacity:.88,roughness:.24});
+  if(isDoor){
+    if(feature.style==='glass'||feature.style==='french'){var panes=feature.style==='french'?2:1,paneW=(size-.22)/panes;for(var i=0;i<panes;i++)box(paneW,height-.45,.035,'#b8d4e2',(i-(panes-1)/2)*(paneW+.08),0,.15,{transparent:true,opacity:.86,roughness:.22});}
+    box(.07,.1,.08,'#99866c',size*.34,-Math.min(.5,height*.05),.2);
+  }else{
+    var count=feature.style==='double'?2:1,pane=(size-.12)/count;for(var j=0;j<count;j++)box(.035,height-.16,.04,'#f7f6f1',(j-(count-1)/2)*(pane+.08),0,.16);
+  }
+  group.add(opening);return opening;
+}
+function buildOutlineRoom(room,points){
+  currentFloorMaterial=null;currentFloorStyleId=null;currentFloorDimensions=null;clearGroup(roomGroup);clearGroup(itemsGroup);objs.clear();walls=[];wallMaterials=[];
+  roomGroup.position.set(Number(room.cx)||0,0,Number(room.cz)||0);itemsGroup.position.set(Number(room.cx)||0,0,Number(room.cz)||0);
+  var bounds=outlineBounds(points),w=bounds.maxX-bounds.minX,d=bounds.maxZ-bounds.minZ;room.w=w;room.d=d;
+  var style=floorStyleOf(room.floor),texture=floorTextureFor(style,w,d),floorMaterial={map:texture,roughness:style.rough,metalness:0};if(style.t==='plank'||style.t==='oak'||style.t==='parquet'){floorMaterial.bumpMap=texture;floorMaterial.bumpScale=.008;}
+  var floorMat=new T.MeshStandardMaterial(floorMaterial),shape=outlineShape(points),floorGeo=new T.ShapeGeometry(shape,1),floor=new T.Mesh(floorGeo,floorMat);floor.rotation.x=-Math.PI/2;floor.position.y=.002;floor.receiveShadow=true;roomGroup.add(floor);
+  if(style.pbr){currentFloorMaterial=floorMat;currentFloorStyleId=style.id;currentFloorDimensions={w:w,d:d};applyFloorPbrMaps();loadFloorPbrMaps(style);}
+  var slabGeo=new T.ShapeGeometry(outlineShape(points),1),slab=new T.Mesh(slabGeo,mat('#CFC9BE'));slab.rotation.x=-Math.PI/2;slab.position.y=-.28;roomGroup.add(slab);
+  var H=room.h||9,wallStyle=wallTextureStyle(room.wallColor),wallColor=new T.Color(wallStyle?'#ffffff':(room.wallColor||WALL_DEFAULT)).convertSRGBToLinear(),wallDoors=room.doors&&room.doors.length?room.doors:[{style:'single',wall:'w',pos:.65}],wallWindows=room.windows&&room.windows.length?room.windows:[{style:'single',wall:'n',pos:.38}];
+  for(var i=0;i<points.length;i++){
+    var a=points[i],b=points[(i+1)%points.length],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<.1)continue;
+    var yaw=Math.atan2(-dz,dx),midX=(a.x+b.x)/2,midZ=(a.z+b.z)/2,normalX=Math.sin(yaw),normalZ=Math.cos(yaw),g=new T.Group();g.position.set(midX,0,midZ);g.rotation.y=yaw;g.userData={edgeIndex:i,nx:-normalX,nz:-normalZ,a:{x:a.x,z:a.z},b:{x:b.x,z:b.z},length:len};
+    var wm=new T.MeshStandardMaterial({color:wallColor.clone(),roughness:wallStyle&&wallStyle.roughness!==undefined?wallStyle.roughness:.9,metalness:0,side:T.DoubleSide});
+    if(wallStyle){wm.userData.wallTextureStyle=wallStyle;wm.userData.wallRepeat={x:len/4,y:H/4};wallMaterials.push(wm);applyWallPbrMaps(wm);loadWallPbrMaps(wallStyle);}
+    var wall=new T.Mesh(new T.BoxGeometry(len,H,.38,12,16,2),wm);wall.position.y=H/2;wall.castShadow=false;wall.receiveShadow=true;g.add(wall);
+    var baseboard=new T.Mesh(new T.BoxGeometry(Math.max(.05,len-.15),.42,.15),mat('#F4F2ED'));baseboard.position.set(0,.21,.12);baseboard.castShadow=false;g.add(baseboard);
+    var doors=wallDoors.filter(function(f){return outlineEdgeForFeature(f,points)===i;});doors.forEach(function(f,j){var c={};Object.keys(f).forEach(function(k){c[k]=f[k];});c.openingIndex=j;addOutlineOpening(g,'door',c,room,i,len);});
+    var windows=wallWindows.filter(function(f){return outlineEdgeForFeature(f,points)===i;});windows.forEach(function(f,j){var c={};Object.keys(f).forEach(function(k){c[k]=f[k];});c.openingIndex=j;addOutlineOpening(g,'window',c,room,i,len);});
+    roomGroup.add(g);walls.push(g);
+  }
+  if(typeof ED!=='undefined'&&ED.open&&ED.step===1){
+    points.forEach(function(p,i){var isSelected=ED.selectedVertex===i,outer=new T.Mesh(new T.SphereGeometry(.2,18,14),new T.MeshBasicMaterial({color:0x151515,depthTest:false})),dot=new T.Mesh(new T.SphereGeometry(.145,18,14),new T.MeshBasicMaterial({color:isSelected?0xffd200:0xffffff,depthTest:false}));outer.position.set(p.x,.19,p.z);dot.position.set(p.x,.2,p.z);dot.userData.roomVertexIndex=i;outer.renderOrder=1000;dot.renderOrder=1001;roomGroup.add(outer);roomGroup.add(dot);});
+  }
+  buildCeiling(room,w,d,H);var span=Math.max(w,d);sun.position.set(w*.3+14,46,d*.5+18);sun.target.position.set(0,0,0);var sh=sun.shadow.camera;sh.left=-span*.9;sh.right=span*.9;sh.top=span*.9;sh.bottom=-span*.9;sh.near=1;sh.far=140;sh.updateProjectionMatrix();
+}
 function buildRoom(room){
+  if(room&&Array.isArray(room.outline)&&room.outline.length>=3){buildOutlineRoom(room,room.outline);return;}
   currentFloorMaterial=null;currentFloorStyleId=null;currentFloorDimensions=null;
   clearGroup(roomGroup);clearGroup(itemsGroup);objs.clear();walls=[];wallMaterials=[];
+  roomGroup.position.set(Number(room.cx)||0,0,Number(room.cz)||0);itemsGroup.position.set(Number(room.cx)||0,0,Number(room.cz)||0);
   var w=room.w,d=room.d;
   var fstyle=floorStyleOf(room.floor),floorTexture=floorTextureFor(fstyle,w,d),floorMaterial={map:floorTexture,roughness:fstyle.rough,metalness:0};
   if(fstyle.t==='plank'||fstyle.t==='oak'||fstyle.t==='parquet'){floorMaterial.bumpMap=floorTexture;floorMaterial.bumpScale=.008;}
@@ -1223,6 +1294,7 @@ function buildRoom(room){
   floor.rotation.x=-Math.PI/2;floor.position.y=.002;floor.receiveShadow=true;roomGroup.add(floor);
   var slab=new T.Mesh(new T.BoxGeometry(w+.8,.5,d+.8),mat('#CFC9BE'));slab.position.y=-.25;roomGroup.add(slab);
   var wallTexture=wallTextureStyle(room.wallColor),H=room.h||9,WC=wallTexture?'#ffffff':(room.wallColor||WALL_DEFAULT),winWall=room.fz?'s':'n',doorWall=room.fx?'e':'w';
+  var wallColorLinear=new T.Color(WC).convertSRGBToLinear(),wallLuminance=wallColorLinear.r*.2126+wallColorLinear.g*.7152+wallColorLinear.b*.0722,lightWallColor=!wallTexture&&wallLuminance>.5;
   var roomWindows=room.windows||[{style:'single',wall:winWall,pos:.38}],roomDoors=room.doors||[{style:'single',wall:doorWall,pos:.65}],defs=[
     {n:'n',nx:0,nz:-1,bw:w+.8,bd:.4,x:0,z:-d/2-.2},
     {n:'s',nx:0,nz:1,bw:w+.8,bd:.4,x:0,z:d/2+.2},
@@ -1230,8 +1302,7 @@ function buildRoom(room){
     {n:'e',nx:1,nz:0,bw:.4,bd:d+.8,x:w/2+.2,z:0}];
   defs.forEach(function(wd){
     var g=new T.Group();g.userData={nx:wd.nx,nz:wd.nz};
-    var wallColorLinear=new T.Color(WC).convertSRGBToLinear();
-    var wallMat=new T.MeshStandardMaterial({color:wallColorLinear,emissive:wallColorLinear.clone(),emissiveIntensity:wallTexture?0:0,roughness:wallTexture&&wallTexture.roughness!==undefined?wallTexture.roughness:.9,metalness:0});
+    var wallMat=new T.MeshStandardMaterial({color:wallColorLinear.clone(),emissive:wallColorLinear.clone(),emissiveIntensity:wallTexture?0:0,roughness:wallTexture&&wallTexture.roughness!==undefined?wallTexture.roughness:.9,metalness:0});
     if(wallTexture){
       wallMat.userData.wallTextureStyle=wallTexture;wallMat.userData.wallRepeat={x:(wd.nx?wd.bd:wd.bw)/4,y:H/4};wallMaterials.push(wallMat);
       applyWallPbrMaps(wallMat);loadWallPbrMaps(wallTexture);
@@ -1247,13 +1318,20 @@ function buildRoom(room){
         var floorT=Math.max(0,Math.min(1,wallY/(H*.28)));floorT=floorT*floorT*(3-2*floorT);var floorFade=1-floorT;
         var topT=Math.max(0,Math.min(1,(H-wallY)/(H*.12)));topT=topT*topT*(3-2*topT);var topFade=1-topT;
         factor=1-.17*edgeFade-.12*floorFade-.10*edgeFade*floorFade-.035*topFade;
+        if(lightWallColor)factor=factor*.92-.08*edgeFade-.04*floorFade-.04*edgeFade*floorFade;
       }
-      vertexColors[vi*3]=vertexColors[vi*3+1]=vertexColors[vi*3+2]=factor;
+      var redFactor=factor,greenFactor=factor,blueFactor=factor;
+      if(room.wallColor==='#b8622a'&&Math.abs(ny)<.5){
+        redFactor*=1-.06*edgeFade-.02*floorFade;
+        greenFactor*=1-.12*edgeFade-.04*floorFade;
+        blueFactor*=1-.18*edgeFade-.07*floorFade;
+      }
+      vertexColors[vi*3]=redFactor;vertexColors[vi*3+1]=greenFactor;vertexColors[vi*3+2]=blueFactor;
     }
     wallGeometry.setAttribute('color',new T.BufferAttribute(vertexColors,3));
     var m=new T.Mesh(wallGeometry,wallMat);m.position.set(wd.x,H/2,wd.z);m.castShadow=false;m.receiveShadow=true;g.add(m);
     var bbw=wd.nx?.12:wd.bw-.2,bbd=wd.nx?wd.bd-.2:.12;
-    var bb=new T.Mesh(new T.BoxGeometry(bbw,.45,bbd),mat('#D8D2C6'));bb.position.set(wd.x-wd.nx*.26,.23,wd.z-wd.nz*.26);bb.castShadow=false;bb.receiveShadow=true;g.add(bb);
+    var bb=new T.Mesh(new T.BoxGeometry(bbw,.45,bbd),mat('#F4F2ED'));bb.position.set(wd.x-wd.nx*.26,.23,wd.z-wd.nz*.26);bb.castShadow=false;bb.receiveShadow=true;g.add(bb);
     roomWindows.forEach(function(f,i){if(f.wall===wd.n)addRoomOpening(g,'window',f,wd,room,i);});
     roomDoors.forEach(function(f,i){if(f.wall===wd.n)addRoomOpening(g,'door',f,wd,room,i);});
     g.children.forEach(function(part){if(part.userData&&part.userData.openingKind)part.traverse(function(o){o.castShadow=false;});});
@@ -1265,9 +1343,26 @@ function buildRoom(room){
       }});
     }
   });
+  (room.partitions||[]).forEach(function(part,index){
+    if(!part||!part.a||!part.b)return;
+    var ax=clampv(Number(part.a.x)||0,-w/2,w/2),az=clampv(Number(part.a.z)||0,-d/2,d/2),bx=clampv(Number(part.b.x)||0,-w/2,w/2),bz=clampv(Number(part.b.z)||0,-d/2,d/2),dx=bx-ax,dz=bz-az,len=Math.sqrt(dx*dx+dz*dz);
+    if(len<.15)return;
+    var pg=new T.Group(),finish=wallTexture?new T.MeshStandardMaterial({color:'#f3eee5',roughness:.88,side:T.DoubleSide}):new T.MeshStandardMaterial({color:new T.Color(WC).convertSRGBToLinear(),vertexColors:false,roughness:.9,side:T.DoubleSide});
+    var panel=new T.Mesh(new T.BoxGeometry(len,H,.16),finish);panel.position.y=H/2;panel.castShadow=false;panel.receiveShadow=true;pg.add(panel);
+    var capMat=new T.MeshStandardMaterial({color:'#d8d2c6',roughness:.9}),cap=new T.Mesh(new T.BoxGeometry(len,.14,.2),capMat);cap.position.y=.07;pg.add(cap);
+    pg.position.set((ax+bx)/2,0,(az+bz)/2);pg.rotation.y=Math.atan2(-dz,dx);pg.userData.partitionIndex=index;roomGroup.add(pg);
+    if(typeof ED!=='undefined'&&ED.open&&ED.step===1&&ED.roomView==='3d'){
+      var dotMat=new T.MeshBasicMaterial({color:0xffd200,depthTest:false}),dotGeo=new T.SphereGeometry(.16,18,14);
+      [[ax,az,'a'],[bx,bz,'b']].forEach(function(v){var dot=new T.Mesh(dotGeo,dotMat);dot.position.set(v[0],.16,v[1]);dot.userData={partitionHandle:true,partitionIndex:index,partitionEnd:v[2]};dot.renderOrder=1001;roomGroup.add(dot);});
+    }
+  });
+  if(typeof ED!=='undefined'&&ED.open&&ED.step===1&&ED.pendingPartition){
+    var startDot=new T.Mesh(new T.SphereGeometry(.2,20,16),new T.MeshBasicMaterial({color:0xffd200,depthTest:false}));
+    startDot.position.set(ED.pendingPartition.x,.2,ED.pendingPartition.z);startDot.userData.partitionStartHandle=true;startDot.renderOrder=1002;roomGroup.add(startDot);
+  }
   buildCeiling(room,w,d,H);
   var span=Math.max(w,d);
-  sun.position.set(w*.3+14,46,d*.5+18);sun.target.position.set(0,0,0);
+  sun.position.set((Number(room.cx)||0)+w*.3+14,46,(Number(room.cz)||0)+d*.5+18);sun.target.position.set(Number(room.cx)||0,0,Number(room.cz)||0);
   var sc=sun.shadow.camera;sc.left=-span*.9;sc.right=span*.9;sc.top=span*.9;sc.bottom=-span*.9;sc.near=1;sc.far=140;sc.updateProjectionMatrix();
 }
 function addRoomOpening(group,kind,feature,wall,room,index){
@@ -1323,6 +1418,7 @@ function openingIsInvalid(kind,feature,room){
 }
 function bx2(g,w,h,d,c,x,y,z,o){var m=new T.Mesh(new T.BoxGeometry(w,h,d),mat(c,o));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;}
 function updateWalls(){
+  if(typeof ED!=='undefined'&&ED.open&&ED.step===1){walls.forEach(function(g){g.visible=true;});return;}
   var dx=camera.position.x-controls.target.x,dz=camera.position.z-controls.target.z;
   var l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;
   walls.forEach(function(g){g.visible=(g.userData.nx*dx+g.userData.nz*dz)<.3;});
@@ -1334,8 +1430,8 @@ function setView(top){
   var dist=(span*1.3+9.5)*Math.max(1,1.3/asp);
   var el_=top?1.5:.68,az=top?0:.55;
   var targetY=top?0:(r.h||9)*.18;
-  controls.target.set(0,targetY,0);
-  camera.position.set(Math.sin(az)*Math.cos(el_)*dist,targetY+Math.sin(el_)*dist,Math.cos(az)*Math.cos(el_)*dist);
+  controls.target.set(Number(r.cx)||0,targetY,Number(r.cz)||0);
+  camera.position.set((Number(r.cx)||0)+Math.sin(az)*Math.cos(el_)*dist,targetY+Math.sin(el_)*dist,(Number(r.cz)||0)+Math.cos(az)*Math.cos(el_)*dist);
   controls.minDistance=6;controls.maxDistance=dist*2.4;controls.update();
   $('vAngle').setAttribute('aria-pressed',top?'false':'true');$('vTop').setAttribute('aria-pressed',top?'true':'false');
 }
@@ -1444,39 +1540,82 @@ function drawMeasurements(){
   if(measurementSettings.spacing)drawSpacingMeasurements(room,measureCtx,w,h);
 }
 function resizeEditorCanvas(){
-  if(!renderer||!ED.open||ED.step<3)return;
+  if(!renderer||!ED.open||!(ED.step===1||ED.step>=3))return;
   var host=$('edStage'),w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;
   renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
 }
 function syncEditorPreview(resetView){
   if(!ED.preview||!ED.base)return;
-  var r=ED.base;r.w=ED.w;r.d=ED.d;r.h=ED.h;r.fx=ED.fx;r.fz=ED.fz;r.wallColor=ED.wallColor;r.floor=ED.floor;r.lights=ED.lights;r.tone=ED.tone;
-  r.doors=ED.doors.map(function(f){return {style:f.style,wall:f.wall,pos:f.pos,width:f.width,height:f.height};});
-  r.windows=ED.windows.map(function(f){return {style:f.style,wall:f.wall,pos:f.pos,width:f.width,height:f.height,elevation:f.elevation};});
+  var r=ED.base,oldCx=Number(r.cx)||0,oldCz=Number(r.cz)||0,moveX=ED.cx-oldCx,moveZ=ED.cz-oldCz,bounds=outlineBounds(ED.outline);ED.w=Math.max(.5,bounds.maxX-bounds.minX);ED.d=Math.max(.5,bounds.maxZ-bounds.minZ);r.w=ED.w;r.d=ED.d;r.outline=ED.outline.map(function(p){return {x:p.x,z:p.z};});r.h=ED.h;r.fx=ED.fx;r.fz=ED.fz;r.wallColor=ED.wallColor;r.floor=ED.floor;r.lights=ED.lights;r.tone=ED.tone;
+  ED.partitions.forEach(function(p){p.a.x=clampv(p.a.x,-ED.w/2,ED.w/2);p.b.x=clampv(p.b.x,-ED.w/2,ED.w/2);p.a.z=clampv(p.a.z,-ED.d/2,ED.d/2);p.b.z=clampv(p.b.z,-ED.d/2,ED.d/2);});
+  r.doors=ED.doors.map(function(f){return {style:f.style,wall:f.wall,edge:f.edge,pos:f.pos,width:f.width,height:f.height};});
+  r.windows=ED.windows.map(function(f){return {style:f.style,wall:f.wall,edge:f.edge,pos:f.pos,width:f.width,height:f.height,elevation:f.elevation};});
+  r.cx=ED.cx;r.cz=ED.cz;
+  if(!resetView&&camera&&(moveX||moveZ)){camera.position.x+=moveX;camera.position.z+=moveZ;controls.target.x+=moveX;controls.target.z+=moveZ;controls.update();}
+  r.partitions=[];
   buildRoom(r);r.items.forEach(mount);if(resetView)setView(false);resizeEditorCanvas();
 }
 function beginEditorPreview(){
   if(ED.preview)return;
   var r=ED.base;if(!r)return;
-  ED.snapshot={w:r.w,d:r.d,h:r.h,fx:r.fx,fz:r.fz,doors:r.doors,windows:r.windows,wallColor:r.wallColor,floor:r.floor,lights:r.lights,tone:r.tone,background:scene.background};ED.preview=true;
+  ED.snapshot={w:r.w,d:r.d,h:r.h,outline:r.outline,fx:r.fx,fz:r.fz,doors:r.doors,windows:r.windows,partitions:r.partitions||[],cx:r.cx||0,cz:r.cz||0,wallColor:r.wallColor,floor:r.floor,lights:r.lights,tone:r.tone,background:scene.background};ED.preview=true;
   scene.background=null;
-  syncEditorPreview(true);$('edStage').appendChild(canvas);resizeEditorCanvas();setView(false);camera.position.multiplyScalar(1.12);controls.update();
+  syncEditorPreview(true);$('edStage').appendChild(canvas);bindPartitionCanvas();resizeEditorCanvas();setView(true);camera.position.multiplyScalar(1.02);controls.update();
+}
+var partitionCanvasBound=false;
+function editorFloorWorldPoint(e,allowOutside){
+  if(!canvas||!ED.base)return null;setNdc(e);raycaster.setFromCamera(ndc,camera);
+  var p=raycaster.ray.intersectPlane(new T.Plane(new T.Vector3(0,1,0),0),new T.Vector3());if(!p)return null;
+  var room=ED.base;if(!allowOutside&&(p.x<ED.cx-room.w/2||p.x>ED.cx+room.w/2||p.z<ED.cz-room.d/2||p.z>ED.cz+room.d/2))return null;return {x:p.x,z:p.z};
+}
+function editorFloorPoint(e){
+  var p=editorFloorWorldPoint(e);return p?{x:p.x-ED.cx,z:p.z-ED.cz}:null;
+}
+function showVertexDelete(index){
+  var el=$('edVertexDelete'),stage=$('edStage'),p=ED.outline[index];if(!el||!p){if(el)el.hidden=true;return;}
+  var world=roomGroup.localToWorld(new T.Vector3(p.x,.35,p.z)).project(camera),rect=stage.getBoundingClientRect();
+  el.style.left=((world.x+1)*rect.width/2)+'px';el.style.top=((1-world.y)*rect.height/2)+'px';el.hidden=false;
+}
+function bindPartitionCanvas(){
+  if(partitionCanvasBound||!canvas)return;partitionCanvasBound=true;
+  canvas.addEventListener('pointerdown',function(e){
+    if(!ED.open||ED.step!==1||ED.roomView!=='3d'||e.button!==0)return;
+    setNdc(e);raycaster.setFromCamera(ndc,camera);var vertices=[];roomGroup.traverse(function(o){if(o.userData&&Number.isInteger(o.userData.roomVertexIndex))vertices.push(o);});
+    var vh=raycaster.intersectObjects(vertices,false)[0];
+    if(vh){var vi=vh.object.userData.roomVertexIndex;ED.selectedVertex=vi;showVertexDelete(vi);ED.vertexDrag={index:vi,startX:e.clientX,startY:e.clientY,moved:false};controls.enabled=false;try{canvas.setPointerCapture(e.pointerId);}catch(_){}e.preventDefault();e.stopPropagation();syncEditorPreview(false);return;}
+    var wh=wallHitFromPointer(e);if(!wh||!Number.isInteger(wh.edgeIndex))return;
+    var a=ED.outline[wh.edgeIndex],b=ED.outline[(wh.edgeIndex+1)%ED.outline.length],dx=b.x-a.x,dz=b.z-a.z,l2=dx*dx+dz*dz;if(l2<.01)return;
+    var t=clampv(((wh.x-a.x)*dx+(wh.z-a.z)*dz)/l2,.04,.96),point={x:a.x+dx*t,z:a.z+dz*t};
+    var floorStart=editorFloorWorldPoint(e,true)||{x:ED.cx+wh.x,z:ED.cz+wh.z};ED.wallDrag={edge:wh.edgeIndex,start:{x:floorStart.x,z:floorStart.z},startX:e.clientX,startY:e.clientY,moved:false};ED.selectedVertex=null;$('edVertexDelete').hidden=true;ED.insertPoint={point:point,t:t};controls.enabled=false;try{canvas.setPointerCapture(e.pointerId);}catch(_){}e.preventDefault();e.stopPropagation();
+  });
+  canvas.addEventListener('pointermove',function(e){
+    if(ED.vertexDrag){var vd=ED.vertexDrag;if(!vd.moved&&Math.hypot(e.clientX-vd.startX,e.clientY-vd.startY)<3)return;vd.moved=true;var p=editorFloorWorldPoint(e,true);if(!p)return;ED.outline[vd.index]={x:p.x-ED.cx,z:p.z-ED.cz};ED.selectedVertex=vd.index;syncEditorPreview(false);showVertexDelete(vd.index);e.preventDefault();return;}
+    if(!ED.wallDrag)return;var st=ED.wallDrag;if(!st.moved&&Math.hypot(e.clientX-st.startX,e.clientY-st.startY)<3)return;st.moved=true;var now=editorFloorWorldPoint(e,true);if(!now)return;var da=ED.outline[st.edge],db=ED.outline[(st.edge+1)%ED.outline.length],ox=now.x-ED.cx-st.start.x,oz=now.z-ED.cz-st.start.z;da.x+=ox;da.z+=oz;db.x+=ox;db.z+=oz;st.start={x:now.x,z:now.z};syncEditorPreview(false);edUpdateInputs();e.preventDefault();
+  });
+  function end(e){
+    if(ED.vertexDrag){var vd=ED.vertexDrag;ED.vertexDrag=null;controls.enabled=true;if(!vd.moved){ED.selectedVertex=vd.index;showVertexDelete(vd.index);}else{ED.selectedVertex=vd.index;showVertexDelete(vd.index);}syncEditorPreview(false);if(e)e.preventDefault();return;}
+    if(!ED.wallDrag)return;var st=ED.wallDrag;ED.wallDrag=null;controls.enabled=true;
+    if(!st.moved&&ED.insertPoint){var ix=st.edge+1;ED.outline.splice(ix,0,ED.insertPoint.point);ED.selectedVertex=ix;}ED.insertPoint=null;syncEditorPreview(false);if(ED.selectedVertex!==null)showVertexDelete(ED.selectedVertex);if(e)e.preventDefault();
+  }
+  canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
+  $('edVertexDeleteBtn').addEventListener('click',function(){var i=ED.selectedVertex;if(i===null||ED.outline.length<=3)return;ED.outline.splice(i,1);ED.selectedVertex=null;$('edVertexDelete').hidden=true;syncEditorPreview(false);edUpdateInputs();});
 }
 function restoreEditorPreview(){
   var snapshot=ED.snapshot;
-  if(ED.preview&&ED.snapshot&&ED.base&&!ED.applied){
-    var r=ED.base,s=ED.snapshot;r.w=s.w;r.d=s.d;r.h=s.h;r.fx=s.fx;r.fz=s.fz;r.doors=s.doors;r.windows=s.windows;r.wallColor=s.wallColor;r.floor=s.floor;r.lights=s.lights;r.tone=s.tone;scene.background=s.background;
+    if(ED.preview&&ED.snapshot&&ED.base&&!ED.applied){
+    var r=ED.base,s=ED.snapshot;r.w=s.w;r.d=s.d;r.h=s.h;r.outline=s.outline;r.fx=s.fx;r.fz=s.fz;r.doors=s.doors;r.windows=s.windows;r.partitions=s.partitions;r.cx=s.cx;r.cz=s.cz;r.wallColor=s.wallColor;r.floor=s.floor;r.lights=s.lights;r.tone=s.tone;scene.background=s.background;
     buildRoom(r);r.items.forEach(mount);setView(false);
   }
   if(snapshot)scene.background=snapshot.background;
-  if(canvas&&canvas.parentNode!==$('stage'))$('stage').appendChild(canvas);
+  if(canvas&&canvas.parentNode!==$('stage'))$('stage').appendChild(canvas);if(canvas)canvas.style.display='block';
   ED.preview=false;ED.snapshot=null;resize();
 }
 function wallHitFromPointer(e){
   setNdc(e);raycaster.setFromCamera(ndc,camera);var hits=raycaster.intersectObjects(walls,true);
   if(!hits.length)return null;
   var wall=hits[0].object;while(wall&&walls.indexOf(wall)<0)wall=wall.parent;if(!wall)return null;
-  var p=wall.worldToLocal(hits[0].point.clone()),room=ED.base,horizontal=wall.userData.nx===0;
+  var room=ED.base;if(Number.isInteger(wall.userData.edgeIndex)){var local=roomGroup.worldToLocal(hits[0].point.clone());return {edgeIndex:wall.userData.edgeIndex,x:local.x,z:local.z,height:local.y};}
+  var p=wall.worldToLocal(hits[0].point.clone()),horizontal=wall.userData.nx===0;
   return {wall:horizontal?(wall.userData.nz<0?'n':'s'):(wall.userData.nx<0?'w':'e'),pos:horizontal?(p.x+room.w/2)/room.w:(p.z+room.d/2)/room.d,height:p.y};
 }
 function openingScreenPoint(wallName,pos,elevation){
@@ -1639,6 +1778,7 @@ function pickUid(){
 function onDown(e){
   if(e.pointerType==='mouse'&&e.button!==0)return;
   if(ED.open&&ED.step===4)return;
+  if(ED.open&&ED.step===1)return;
   if(ED.open&&ED.step===3){
     var opening=openingHitFromPointer(e);if(opening){var openingList=opening.openingKind==='door'?ED.doors:ED.windows,openingFeature=openingList[opening.openingIndex],openingElevation=Number.isFinite(Number(openingFeature.elevation))?Number(openingFeature.elevation):5.1;
       ED.selected={kind:opening.openingKind,index:opening.openingIndex};updateOpeningCustomize();edRenderOpeningList();
@@ -1818,9 +1958,9 @@ $('copySum').addEventListener('click',function(){
 });
 
 /* ---------- Room editor: drag walls / corners to resize, ceiling height, flip ---------- */
-var ED={open:false,mode:'plan',step:1,unit:'ft',w:10,d:10,h:9,fx:false,fz:false,sc:20,x0:0,y0:0,x1:0,y1:0,drag:null,hist:[],redo:[],base:null,doors:[],windows:[],preview:false,snapshot:null,applied:false,selected:null,wallColor:WALL_DEFAULT,floor:FLOOR_DEFAULT,lights:true,tone:'cool'};
+var ED={open:false,mode:'plan',roomView:'3d',step:1,unit:'ft',w:10,d:10,h:9,cx:0,cz:0,fx:false,fz:false,sc:20,x0:0,y0:0,x1:0,y1:0,drag:null,wallDrag:null,outline:[],insertPoint:null,vertexDrag:null,selectedVertex:null,hist:[],redo:[],base:null,doors:[],windows:[],partitions:[],preview:false,snapshot:null,applied:false,selected:null,wallColor:WALL_DEFAULT,floor:FLOOR_DEFAULT,lights:true,tone:'cool'};
 var SVGNS='http://www.w3.org/2000/svg';
-var MINW=6,MAXW=60,MINH=8,MAXH=14,HS=30,BASE=500;
+var MINW=3,MAXW=100,MINH=8,MAXH=14,HS=30,BASE=500;
 function sv(tag,attrs,parent){var e=document.createElementNS(SVGNS,tag);for(var k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
 function clampv(v,a,b){return Math.max(a,Math.min(b,v));}
 function fmtLen(ft){
@@ -1872,6 +2012,7 @@ function edDraw(){
   var area=sv('text',{x:mx,y:my+5,'text-anchor':'middle',class:'tag'},svg);area.textContent=Math.round(ED.w*ED.d)+' sq ft';
   dimH(svg,x0,x1,y0-44,fmtLen(ED.w));
   dimV(svg,x0-44,y0,y1,fmtLen(ED.d));
+  ED.partitions.forEach(function(p){var ax=x0+(p.a.x+ED.w/2)*sc,ay=y0+(p.a.z+ED.d/2)*sc,bx=x0+(p.b.x+ED.w/2)*sc,by=y0+(p.b.z+ED.d/2)*sc;sv('line',{x1:ax,y1:ay,x2:bx,y2:by,stroke:'#6B4A33','stroke-width':8,'stroke-linecap':'round'},svg);sv('circle',{cx:ax,cy:ay,r:5,fill:'#FFD200'},svg);sv('circle',{cx:bx,cy:by,r:5,fill:'#FFD200'},svg);});
   wallHandle(svg,'n',x0,y0,x1,y0,'ns-resize',T,dg==='n');
   wallHandle(svg,'s',x0,y1,x1,y1,'ns-resize',T,dg==='s');
   wallHandle(svg,'w',x0,y0,x0,y1,'ew-resize',T,dg==='w');
@@ -1921,6 +2062,7 @@ function nearestWall(p){
 }
 function placeOpening(kind,style,p){
   var hit=p&&ED.preview?(p.wall? p:wallHitFromPointer(p)):null;
+  if(hit&&Number.isInteger(hit.edgeIndex)){var a=ED.outline[hit.edgeIndex],b=ED.outline[(hit.edgeIndex+1)%ED.outline.length],dx=b.x-a.x,dz=b.z-a.z,l2=dx*dx+dz*dz,t=l2?clampv(((hit.x-a.x)*dx+(hit.z-a.z)*dz)/l2,.08,.92):.5,list=kind==='door'?ED.doors:ED.windows,item={style:style,wall:'n',edge:hit.edgeIndex,pos:t};list.push(item);ED.selected={kind:kind,index:list.length-1};edRenderOpeningList();updateOpeningCustomize();edDraw();syncEditorPreview(false);return;}
   var wall=hit?hit.wall:(p?nearestWall(p):(kind==='door'?(ED.fx?'e':'w'):(ED.fz?'s':'n')));
   var pos=hit?hit.pos:(p?(wall==='n'||wall==='s'?(p.x-ED.x0)/(ED.x1-ED.x0):(p.y-ED.y0)/(ED.y1-ED.y0)):.65);
   var list=kind==='door'?ED.doors:ED.windows,item={style:style,wall:wall,pos:clampv(pos,.08,.92)};list.push(item);ED.selected={kind:kind,index:list.length-1};edRenderOpeningList();updateOpeningCustomize();edDraw();syncEditorPreview(false);
@@ -1958,44 +2100,52 @@ function edUpdateInputs(){
   if(a!==$('edW'))$('edW').value=show(ED.w);
   if(a!==$('edD'))$('edD').value=show(ED.d);
   if(a!==$('edH'))$('edH').value=show(ED.h);
-  $('edArea').textContent=Math.round(ED.w*ED.d)+' sq ft · '+(Math.round(ED.w*ED.d*0.092903*10)/10)+' m²';
+  var area=outlineArea(ED.outline);$('edArea').textContent=Math.round(area)+' sq ft · '+(Math.round(area*0.092903*10)/10)+' m²';
+}
+function edRenderPartitions(){
+  var box=$('edPartitionList');if(!box)return;box.textContent='';
+  ED.partitions.forEach(function(p,i){
+    var row=el('div','ed-partition-row'),length=Math.sqrt(Math.pow(p.b.x-p.a.x,2)+Math.pow(p.b.z-p.a.z,2)),label=el('span','','Partition '+(i+1)+' · '+r1(length)+' ft'),remove=el('button','','Remove');
+    remove.type='button';remove.addEventListener('click',function(){ED.partitions.splice(i,1);syncEditorPreview(false);edRenderPartitions();});row.appendChild(label);row.appendChild(remove);box.appendChild(row);
+  });
+  if(!ED.partitions.length)box.appendChild(el('p','ed-note','No partitions added.'));
 }
 function edSync(){
-  var openings=ED.step===3,look=ED.step===4,preview=ED.step>=3,plan=ED.mode==='plan'&&!preview;
+  var openings=ED.step===3,look=ED.step===4,preview=ED.step>=3||(ED.step===1&&ED.roomView==='3d');
   $('edStep').textContent='Step '+ED.step+' of 4';
-  $('edTitle').textContent=look?'Style the walls and flooring':(openings?'Add doors and windows':(plan?'Edit room dimensions':'Set ceiling height'));
-  $('edHelp1').textContent=look?'Choose a wall color and floor material to personalize your room.':(openings?'Choose a door or window style, then drag it onto a wall.':'Click and drag the walls to adjust the room dimensions or ceiling height.');
-  $('edHelp2').textContent=look?'Your choices show in the 3D room instantly. Toggle lighting to switch the ceiling lights on or off; tap Lights to inspect the ceiling.':(openings?'Drag doors and windows in the 3D room to move them.':'Enter exact measurements or drag the room outline.');
-  if(preview){
-    beginEditorPreview();
-    resizeEditorCanvas();
-  }
-  $('edDimensions').hidden=preview;$('edOpenings').hidden=!openings;$('edLook').hidden=!look;
-  $('edStage').classList.toggle('features',openings);$('edPillViews').hidden=preview;$('edPillCam').hidden=!look;$('edHint').hidden=!look;if(preview)$('edSvg').setAttribute('hidden','');else $('edSvg').removeAttribute('hidden');
+  $('edTitle').textContent=look?'Style the walls and flooring':(openings?'Add doors and windows':(ED.step===1?'Edit room dimensions':'Set ceiling height'));
+  $('edHelp1').textContent=look?'Choose a wall color and floor material to personalize your room.':(openings?'Choose a door or window style, then drag it onto a wall.':ED.step===1?'Click a wall to add a corner, then drag the dots to shape your room.':'Click and drag the top of the wall to adjust ceiling height.');
+  $('edHelp2').textContent=look?'Your choices show in the 3D room instantly. Toggle lighting to switch the ceiling lights on or off; tap Lights to inspect the ceiling.':(openings?'Drag doors and windows in the 3D room to move them.':ED.step===1?'Click a corner dot to select it; use Delete to remove it.':'Enter a ceiling height or drag the wall top.');
+  if(preview){beginEditorPreview();syncEditorPreview(false);$('edStage').classList.add('live-room');canvas.style.display='block';resizeEditorCanvas();}
+  else{$('edStage').classList.remove('live-room');if(ED.preview){syncEditorPreview(false);if(canvas)canvas.style.display='none';}}
+  $('edDimensions').hidden=ED.step>=3;$('edOpenings').hidden=!openings;$('edLook').hidden=!look;
+  $('edStage').classList.toggle('features',openings);$('edPillViews').hidden=ED.step>=3;$('edPillCam').hidden=!look;$('edHint').hidden=!look;$('edPartitionHint').hidden=!(ED.step===1&&ED.roomView==='3d');
+  if(ED.step!==2)$('edSvg').setAttribute('hidden','');else $('edSvg').removeAttribute('hidden');
   if(openings)updateOpeningCustomize();
   if(look)renderLookPanel();
   Array.prototype.forEach.call($('edProgress').children,function(seg,i){seg.className=i<ED.step?'on':'';});
-  $('edTabPlan').setAttribute('aria-pressed',plan?'true':'false');
-  $('edTabCeil').setAttribute('aria-pressed',(!plan&&!preview)?'true':'false');
+  $('edTabPlan').setAttribute('aria-pressed',ED.step===1?'true':'false');
+  $('edTabCeil').setAttribute('aria-pressed',ED.step===2?'true':'false');
   $('edNext').textContent=ED.step<4?'Next':'Apply to room';
   $('edCancel').textContent=ED.step===1?'Cancel':'Go back';
   Array.prototype.forEach.call($('edUnit').children,function(b){b.setAttribute('aria-pressed',b.getAttribute('data-u')===ED.unit?'true':'false');});
   $('edFlipH').setAttribute('aria-pressed',ED.fx?'true':'false');
   $('edFlipV').setAttribute('aria-pressed',ED.fz?'true':'false');
   $('edUndo').disabled=!ED.hist.length||preview;$('edRedo').disabled=!ED.redo.length||preview;
-  edUpdateInputs();if(openings)edRenderOpeningList();edDraw();
+  edUpdateInputs();if(openings)edRenderOpeningList();edRenderPartitions();edDraw();
 }
-function edState(){return {w:ED.w,d:ED.d,h:ED.h};}
+function edState(){return {w:ED.w,d:ED.d,h:ED.h,outline:ED.outline.map(function(p){return {x:p.x,z:p.z};})};}
 function edPush(){ED.hist.push(edState());if(ED.hist.length>60)ED.hist.shift();ED.redo=[];}
-function edSet(s){ED.w=s.w;ED.d=s.d;ED.h=s.h;edFit();edSync();}
+function edSet(s){ED.w=s.w;ED.d=s.d;ED.h=s.h;if(s.outline)ED.outline=s.outline;edFit();edSync();}
 function edUndo(){if(!ED.hist.length)return;ED.redo.push(edState());edSet(ED.hist.pop());}
 function edRedo(){if(!ED.redo.length)return;ED.hist.push(edState());edSet(ED.redo.pop());}
 function openEditor(){
   var r=cur();if(!r)return;
-  ED.base=r;ED.w=r.w;ED.d=r.d;ED.h=r.h||9;ED.fx=!!r.fx;ED.fz=!!r.fz;
-  ED.doors=(r.doors||[{style:'single',wall:ED.fx?'e':'w',pos:.65}]).map(function(f){return {style:f.style,wall:f.wall,pos:f.pos,width:f.width,height:f.height};});
-  ED.windows=(r.windows||[{style:'single',wall:ED.fz?'s':'n',pos:.38}]).map(function(f){return {style:f.style,wall:f.wall,pos:f.pos,width:f.width,height:f.height,elevation:f.elevation};});
-  ED.mode='plan';ED.step=1;ED.hist=[];ED.redo=[];ED.drag=null;ED.open=true;ED.preview=false;ED.snapshot=null;ED.applied=false;ED.selected=null;
+  ED.base=r;ED.w=r.w;ED.d=r.d;ED.h=r.h||9;ED.outline=roomOutline(r);ED.selectedVertex=null;ED.fx=!!r.fx;ED.fz=!!r.fz;
+  ED.doors=(r.doors||[{style:'single',wall:ED.fx?'e':'w',pos:.65}]).map(function(f){return {style:f.style,wall:f.wall,edge:f.edge,pos:f.pos,width:f.width,height:f.height};});
+  ED.windows=(r.windows||[{style:'single',wall:ED.fz?'s':'n',pos:.38}]).map(function(f){return {style:f.style,wall:f.wall,edge:f.edge,pos:f.pos,width:f.width,height:f.height,elevation:f.elevation};});
+  ED.partitions=[];
+  ED.cx=Number(r.cx)||0;ED.cz=Number(r.cz)||0;ED.mode='plan';ED.roomView='3d';ED.step=1;ED.hist=[];ED.redo=[];ED.drag=null;ED.wallDrag=null;ED.insertPoint=null;ED.vertexDrag=null;ED.open=true;ED.preview=false;ED.snapshot=null;ED.applied=false;ED.selected=null;$('edVertexDelete').hidden=true;
   ED.wallColor=r.wallColor||WALL_DEFAULT;ED.floor=r.floor||FLOOR_DEFAULT;ED.lights=r.lights!==false;ED.tone=r.tone||'cool';
   $('editor').hidden=false;document.body.style.overflow='hidden';
   edFit();edSync();$('edClose').focus();
@@ -2011,10 +2161,11 @@ function applyEditor(){
     if(flipX){it.x=-it.x;it.rot=(360-it.rot)%360;}
     if(flipZ){it.z=-it.z;it.rot=(540-it.rot)%360;}
   });
-  r.w=Math.round(ED.w*100)/100;r.d=Math.round(ED.d*100)/100;r.h=ED.h;r.fx=ED.fx;r.fz=ED.fz;r.wallColor=ED.wallColor;r.floor=ED.floor;r.lights=ED.lights;r.tone=ED.tone;
+  var bounds=outlineBounds(ED.outline);r.w=Math.round((bounds.maxX-bounds.minX)*100)/100;r.d=Math.round((bounds.maxZ-bounds.minZ)*100)/100;r.outline=ED.outline.map(function(p){return {x:p.x,z:p.z};});r.h=ED.h;r.fx=ED.fx;r.fz=ED.fz;r.wallColor=ED.wallColor;r.floor=ED.floor;r.lights=ED.lights;r.tone=ED.tone;r.cx=0;r.cz=0;r.partitions=[];
   if(flipX){ED.doors.concat(ED.windows).forEach(function(f){if(f.wall==='w')f.wall='e';else if(f.wall==='e')f.wall='w';else f.pos=1-f.pos;});}
   if(flipZ){ED.doors.concat(ED.windows).forEach(function(f){if(f.wall==='n')f.wall='s';else if(f.wall==='s')f.wall='n';else f.pos=1-f.pos;});}
-  r.doors=ED.doors.map(function(f){return {style:f.style,wall:f.wall,pos:f.pos,width:f.width,height:f.height};});r.windows=ED.windows.map(function(f){return {style:f.style,wall:f.wall,pos:f.pos,width:f.width,height:f.height,elevation:f.elevation};});
+  r.outline.forEach(function(p){if(flipX)p.x=-p.x;if(flipZ)p.z=-p.z;});
+  r.doors=ED.doors.map(function(f){return {style:f.style,wall:f.wall,edge:f.edge,pos:f.pos,width:f.width,height:f.height};});r.windows=ED.windows.map(function(f){return {style:f.style,wall:f.wall,edge:f.edge,pos:f.pos,width:f.width,height:f.height,elevation:f.elevation};});
   r.items.forEach(function(it){fit(it,r,false);});
   ED.applied=true;closeEditor();
   S.sel=null;buildRoom(r);r.items.forEach(mount);setView(false);
@@ -2081,6 +2232,10 @@ function applyEditor(){
       var v=parseFloat(e.target.value);if(!Number.isFinite(v)){edSync();return;}
       if(ED.unit==='cm')v=v/30.48;
       edPush();ED[key]=clampv(v,min,max);
+      if(key==='w'||key==='d'){
+        var bounds=outlineBounds(ED.outline),lo=key==='w'?bounds.minX:bounds.minZ,hi=key==='w'?bounds.maxX:bounds.maxZ,center=(lo+hi)/2,span=Math.max(.001,hi-lo),factor=ED[key]/span;
+        ED.outline.forEach(function(p){if(key==='w')p.x=center+(p.x-center)*factor;else p.z=center+(p.z-center)*factor;});
+      }
       edFit();edSync();
     });
   }
@@ -2088,7 +2243,7 @@ function applyEditor(){
   Array.prototype.forEach.call($('edUnit').children,function(b){b.addEventListener('click',function(){ED.unit=b.getAttribute('data-u');edSync();});});
   $('edFlipH').addEventListener('click',function(){ED.fx=!ED.fx;edSync();});
   $('edFlipV').addEventListener('click',function(){ED.fz=!ED.fz;edSync();});
-  $('edTabPlan').addEventListener('click',function(){ED.mode='plan';ED.step=1;edSync();});
+  $('edTabPlan').addEventListener('click',function(){ED.mode='plan';ED.step=1;ED.roomView='3d';edSync();setView(true);});
   $('edTabCeil').addEventListener('click',function(){ED.mode='ceil';ED.step=2;edSync();});
   $('edNext').addEventListener('click',function(){if(ED.step===1){ED.mode='ceil';ED.step=2;edSync();}else if(ED.step===2){ED.mode='plan';ED.step=3;edSync();}else if(ED.step===3){ED.mode='plan';ED.step=4;edSync();}else applyEditor();});
   $('edCancel').addEventListener('click',function(){
